@@ -118,10 +118,10 @@ sub scanFile
 
     while (<FILE>)
     {
-        if (!(m/^(\S\S\S) +(\d?\d)/)) { die "Error parse $_"; };
+        next if (!(m/^(\S\S\S) +(\d?\d)/));
 
-            die "Can't found month \"$1\"" if !exists $MONTHS{$1};
-            my $iDate = sprintf("%02d%02d", $MONTHS{$1}, $2);
+        next if !exists $MONTHS{$1};
+        my $iDate = sprintf("%02d%02d", $MONTHS{$1}, $2);
 
         # Some optimizations .........................
         if ($iDate<$start && $optLimit<$iDate)
@@ -136,7 +136,7 @@ sub scanFile
 
 
         #            1        2            3          4     5     6
-        if (!(m/^(\S\S\S) +(\d?\d) (\d\d:\d\d:\d\d) (\S+) (\S+): (.*)/)) { die "Error parse $_"; };
+        next if (!(m/^(\S\S\S) +(\d?\d) (\d\d:\d\d:\d\d) (\S+) (\S+): (.*)/));
 
         my $date="$2 $1";
         my $time=$3;
