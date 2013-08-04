@@ -80,16 +80,17 @@ exit;
 #*******************************************************************************
 # Main scan function
 #*******************************************************************************
-sub scan{
+sub scan
+{
     my $pattern = $_[0];
     my @lt = localtime($_[1]);
     my $start = sprintf("%02d%02d", $lt[$MON], $lt[$DAY]);
     @lt = localtime($_[2]);
     my $stop  = sprintf("%02d%02d", $lt[$MON], $lt[$DAY]);
 
-    foreach my $file (sort{$b cmp $a}(glob($pattern))){
-	scanFile($file, $start, $stop);
-
+    foreach my $file (sort{$b cmp $a}(glob($pattern)))
+    {
+        scanFile($file, $start, $stop);
     }
 
 }
@@ -98,39 +99,44 @@ sub scan{
 #*******************************************************************************
 # Scan single file
 #*******************************************************************************
-sub scanFile{
+sub scanFile
+{
     my $fileName = shift;
     my $start = shift;
     my $stop = shift;
 
     my $mime = `file --mime-type "$fileName"`;
-    if ($mime=~ m|application/x-gzip|){
-	open(FILE, "zcat \"$fileName\" |") or die "Can't open \"$fileName\" file.";
+    if ($mime=~ m|application/x-gzip|)
+    {
+        open(FILE, "zcat \"$fileName\" |") or die "Can't open \"$fileName\" file.";
     }
-    else{
-	open(FILE, $fileName) or die "Can't open \"$fileName\" file.";
+    else
+    {
+        open(FILE, $fileName) or die "Can't open \"$fileName\" file.";
     }
 
 
-    while (<FILE>){
-	if (!(m/^(\S\S\S) +(\d?\d)/)) { die "Error parse $_"; };
+    while (<FILE>)
+    {
+        if (!(m/^(\S\S\S) +(\d?\d)/)) { die "Error parse $_"; };
 
-        die "Can't found month \"$1\"" if !exists $MONTHS{$1};
-        my $iDate = sprintf("%02d%02d", $MONTHS{$1}, $2);
+            die "Can't found month \"$1\"" if !exists $MONTHS{$1};
+            my $iDate = sprintf("%02d%02d", $MONTHS{$1}, $2);
 
         # Some optimizations .........................
-	if ($iDate<$start && $optLimit<$iDate){
-	    $optLimit = $iDate;
+        if ($iDate<$start && $optLimit<$iDate)
+        {
+            $optLimit = $iDate;
         }
 
         last if ($iDate<$optLimit);
         next if ($iDate<$start);
         last if ($iDate>$stop);
-	# ............................................
+        # ............................................
 
 
         #            1        2            3          4     5     6
-	if (!(m/^(\S\S\S) +(\d?\d) (\d\d:\d\d:\d\d) (\S+) (\S+): (.*)/)) { die "Error parse $_"; };
+        if (!(m/^(\S\S\S) +(\d?\d) (\d\d:\d\d:\d\d) (\S+) (\S+): (.*)/)) { die "Error parse $_"; };
 
         my $date="$2 $1";
         my $time=$3;
@@ -139,11 +145,12 @@ sub scanFile{
 
         next if ($proc!~ m/^postfix/);
 
-        if ($msg=~ m/^([0-9A-Fa-f]+): (.*)/) {
-	    $msgs{$1}{'order'}=$date . $time;
-	    $msgs{$1}{'date'}=$date;
-    	    $msgs{$1}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $2" ;
-	};
+        if ($msg=~ m/^([0-9A-Fa-f]+): (.*)/)
+        {
+            $msgs{$1}{'order'}=$date . $time;
+            $msgs{$1}{'date'}=$date;
+            $msgs{$1}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $2" ;
+        };
     };
     close(FILE);
 };
@@ -152,23 +159,28 @@ sub scanFile{
 #******************************************************************************
 # Delete not matched records
 #******************************************************************************
-sub clean{
-    foreach my $key (keys(%msgs)){
-	my $s=$msgs{$key}{'msg'};
-	if ($to     && ($s!~ m/to=<\S*$to\S*>/i)) {
-	    delete $msgs{$key};
-	    next;
-	}
+sub clean
+{
+    foreach my $key (keys(%msgs))
+    {
+        my $s=$msgs{$key}{'msg'};
+        if ($to     && ($s!~ m/to=<\S*$to\S*>/i))
+        {
+            delete $msgs{$key};
+            next;
+        }
 
-	if ($from   && ($s!~ m/from=<\S*$from\S*>/i)){
-	    delete $msgs{$key};
-	    next;
-	}
+        if ($from   && ($s!~ m/from=<\S*$from\S*>/i))
+        {
+            delete $msgs{$key};
+            next;
+        }
 
-	if ($errors && ($s=~ m/status=sent/i)){
-	    delete $msgs{$key};
-	    next;
-	}
+        if ($errors && ($s=~ m/status=sent/i))
+        {
+            delete $msgs{$key};
+            next;
+        }
     }
 }
 
@@ -176,7 +188,8 @@ sub clean{
 #******************************************************************************
 # Print results table
 #******************************************************************************
-sub printResults{
+sub printResults
+{
     my $COLOR_NORM="\e[0;39m";
     my $COLOR_TO="\e[0;36m";
     my $COLOR_FROM="\e[0;33m";
@@ -188,25 +201,24 @@ sub printResults{
     my $num=scalar(keys(%msgs));
     open (PAGER, "| $LESS --prompt='Found $num mails.  Line %lt-%lb.'");
 
-    foreach my $key (sort{$msgs{$a}{'order'} cmp $msgs{$b}{'order'}}(keys(%msgs))){
+    foreach my $key (sort{$msgs{$a}{'order'} cmp $msgs{$b}{'order'}}(keys(%msgs)))
+    {
 
-	my $s=$msgs{$key}{'msg'};
+        my $s=$msgs{$key}{'msg'};
 
-	$s=~ s/to=<(.*?)>/to=<$COLOR_TO$1$COLOR_NORM>/g;
-	$s=~ s/from=<(.*?)>/from=<$COLOR_FROM$1$COLOR_NORM>/g;
+        $s=~ s/to=<(.*?)>/to=<$COLOR_TO$1$COLOR_NORM>/g;
+        $s=~ s/from=<(.*?)>/from=<$COLOR_FROM$1$COLOR_NORM>/g;
 
-	my $status='';
-	$status=$COLOR_OK     if ($s=~ s/(status=sent.*)/$COLOR_OK$1$COLOR_NORM/g);
-	$status=$COLOR_BOUNCE if ($s=~ s/(status=bounced.*)/$COLOR_BOUNCE$1$COLOR_NORM/g);
+        my $status='';
+        $status=$COLOR_OK     if ($s=~ s/(status=sent.*)/$COLOR_OK$1$COLOR_NORM/g);
+        $status=$COLOR_BOUNCE if ($s=~ s/(status=bounced.*)/$COLOR_BOUNCE$1$COLOR_NORM/g);
 
-	print PAGER sprintf("%s%s  ...............................%s%s\n%s\n\n\n",
-				$status,
-				$key,
-				$COLOR_NORM,
-				$msgs{$key}{'date'},
-				$s
-			    );
-
+        print PAGER sprintf("%s%s  ...............................%s%s\n%s\n\n\n",
+                            $status,
+                            $key,
+                            $COLOR_NORM,
+                            $msgs{$key}{'date'},
+                            $s);
     }
 
     close(PAGER);
@@ -216,16 +228,18 @@ sub printResults{
 #******************************************************************************
 # Parse comand-line parametres
 #******************************************************************************
-sub param{
+sub param
+{
     my $param;
-    while ($param=shift){
-	if    ($param eq '-h'){ help() }
-	elsif ($param eq '-V'){ showVer() }
-	elsif ($param eq '-v'){ $verbose++ }
-	elsif ($param eq '-e'){ $errors = 1 }
-	elsif ($param eq '-t'){ $to =   shift }
-	elsif ($param eq '-f'){ $from = shift }
-	elsif ($param eq '-d'){ parseDateParam(shift, $bDate, $eDate) }
+    while ($param=shift)
+    {
+        if    ($param eq '-h'){ help() }
+        elsif ($param eq '-V'){ showVer() }
+        elsif ($param eq '-v'){ $verbose++ }
+        elsif ($param eq '-e'){ $errors = 1 }
+        elsif ($param eq '-t'){ $to =   shift }
+        elsif ($param eq '-f'){ $from = shift }
+        elsif ($param eq '-d'){ parseDateParam(shift, $bDate, $eDate) }
     };
 
     $from=~ s/\./\\\./g;
@@ -238,7 +252,8 @@ sub param{
 # $_[1] - begin date and
 # $_[2] - end date
 #*******************************************************************************
-sub parseDateParam($$$){
+sub parseDateParam($$$)
+{
     (my $b, my $e)=split('-', $_[0], 2);
     $_[1]=str2date($b?$b:'01/01/1970');
     $_[2]=str2date($e) if $e;
@@ -249,7 +264,8 @@ sub parseDateParam($$$){
 #******************************************************************************
 # Parse string & return timestamp
 #******************************************************************************
-sub str2date{
+sub str2date
+{
     my ($d,$m,$y) = split ('\D', $_[0], 3);
     $m = $now[$MON]+1  if (!$m);
     $y = $now[$YEAR] if (!$y);
@@ -260,17 +276,20 @@ sub str2date{
 #******************************************************************************
 # Print help message
 #******************************************************************************
-sub help{
+sub help
+{
     open(FILE, $0);
 
-    while (<FILE>){
-	last if $_ eq "\n";
+    while (<FILE>)
+    {
+        last if $_ eq "\n";
     };
 
-    while (<FILE>){
-	last if $_ eq "\n";
-	s/^#//;
-	print $_;
+    while (<FILE>)
+    {
+        last if $_ eq "\n";
+        s/^#//;
+        print $_;
     };
     close FILE;
     exit;
@@ -280,14 +299,16 @@ sub help{
 #******************************************************************************
 # Print version
 #******************************************************************************
-sub showVer{
+sub showVer
+{
     open(FILE, $0);
 
     <FILE>;
-    while (<FILE>){
-	last if $_ eq "\n";
-	s/^#//;
-	print $_;
+    while (<FILE>)
+    {
+        last if $_ eq "\n";
+        s/^#//;
+        print $_;
     };
     close FILE;
     exit;
