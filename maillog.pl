@@ -38,9 +38,8 @@
 
 # Settings ###################################################################
 
-my $filePattern='/var/log/mail/mail*.log';
+my $filePattern='/var/log/mail/mail*.{log,log.gz}';
 my $LESS="less -S -R --shift=1";
-
 
 use strict;
 use Time::Local;
@@ -106,7 +105,7 @@ sub scanFile
     my $stop = shift;
 
     my $mime = `file --mime-type "$fileName"`;
-    if ($mime=~ m|application/x-gzip|)
+    if ($mime=~ m@application/gzip|application/x-gzip@)
     {
         open(FILE, "zcat \"$fileName\" |") or die "Can't open \"$fileName\" file.";
     }
