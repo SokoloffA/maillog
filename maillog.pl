@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # Анализатор почтовых логов
-# Ver 1.5
+# Ver 1.6
 #
 # Copyright (C) 2010 Alexander Sokoloff <asokol@mail.ru>
 #
