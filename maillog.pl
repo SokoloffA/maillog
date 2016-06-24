@@ -142,17 +142,50 @@ sub scanFile
         my $proc=$5;
         my $msg=$6;
 
-        next if ($proc!~ m/^postfix/);
+        my $id;
+        my $text;
+        ($id, $text) = parsePostfixLine($msg)   if ($proc =~ m/^postfix/);
+        ($id, $text) = parseAmavisLine($msg)    if ($proc =~ m/^amavis/);
 
-        if ($msg=~ m/^([0-9A-Fa-f]+): (.*)/)
+        if ($id)
         {
-            $msgs{$1}{'order'}=$date . $time;
-            $msgs{$1}{'date'}=$date;
-            $msgs{$1}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $2" ;
+            $msgs{$id}{'order'}=$date . $time;
+            $msgs{$id}{'date'}=$date;
+            $msgs{$id}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $text";
         };
     };
     close(FILE);
 };
+
+
+#******************************************************************************
+# Parse lines from Postfix
+#******************************************************************************
+sub parsePostfixLine
+{
+    my $msg  = shift;
+
+    if ($msg=~ m/^([0-9A-Fa-f]+): (.*)/)
+    {
+        return ($1, $2);
+    };
+    return ("", "");
+}
+
+
+#******************************************************************************
+# Parse lines from Amavis
+#******************************************************************************
+sub parseAmavisLine
+{
+    my $msg  = shift;
+    if ($msg=~ m/(.*)Queue-ID: ([0-9A-Fa-f]+),(.*)/)
+    {
+        return ($2, "$1$3");
+
+    }
+    return ("", "");
+}
 
 
 #******************************************************************************
