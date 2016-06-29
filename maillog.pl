@@ -64,6 +64,16 @@ my $stat=0;
 my %msgs;
 my $optLimit = 0; # For scan optimization
 
+my $STATUS_OK = 0;
+my $STATUS_ERR = 1;
+
+my $COLOR_NORM="\e[0;39m";
+my $COLOR_TO="\e[0;36m";
+my $COLOR_FROM="\e[0;33m";
+my $COLOR_OK="\e[0;32m";
+my $COLOR_BOUNCE="\e[0;31m";
+
+
 param(@ARGV);
 
 scan($filePattern, $bDate, $eDate);
@@ -73,6 +83,7 @@ clean();
 printResults();
 
 exit;
+
 
 
 
@@ -142,20 +153,32 @@ sub scanFile
         my $proc=$5;
         my $msg=$6;
 
-        my $id;
-        my $text;
-        ($id, $text) = parsePostfixLine($msg)   if ($proc =~ m/^postfix/);
-        ($id, $text) = parseAmavisLine($msg)    if ($proc =~ m/^amavis/);
+        my %rec;
+        %rec = parsePostfixLine($msg)   if ($proc =~ m/^postfix/);
+        %rec = parseAmavisLine($msg)    if ($proc =~ m/^amavis/);
 
-        if ($id)
+
+        if ($rec{'id'})
         {
+            my $id = $rec{'id'};
             $msgs{$id}{'order'}=$date . $time;
             $msgs{$id}{'date'}=$date;
-            $msgs{$id}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $text";
+            $msgs{$id}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $rec{'msg'}";
+            $msgs{$id}{'status'} = $rec{'status'} if ($msgs{$id}{'status'} < $rec{'status'});
         };
     };
     close(FILE);
 };
+
+
+sub newParseResult
+{
+    return {
+        id => "",
+        text => "",
+        status => 0
+    }
+}
 
 
 #******************************************************************************
@@ -164,12 +187,19 @@ sub scanFile
 sub parsePostfixLine
 {
     my $msg  = shift;
+    my %res = newParseResult();
 
     if ($msg=~ m/^([0-9A-Fa-f]+): (.*)/)
     {
-        return ($1, $2);
+        $res{'id'} = $1;
+
+        my $text = $2;
+        $res{'status'} = $STATUS_OK  if ($text=~ s/(status=sent.*)/$COLOR_OK$1$COLOR_NORM/g);
+        $res{'status'} = $STATUS_ERR if ($text=~ s/(status=bounced.*)/$COLOR_BOUNCE$1$COLOR_NORM/g);
+        $res{'msg'} = $text;
     };
-    return ("", "");
+
+    return %res;
 }
 
 
@@ -179,12 +209,17 @@ sub parsePostfixLine
 sub parseAmavisLine
 {
     my $msg  = shift;
+    my %res = newParseResult();
+
     if ($msg=~ m/(.*)Queue-ID: ([0-9A-Fa-f]+),(.*)/)
     {
-        return ($2, "$1$3");
+        $res{'id'} = $2;
 
+        my $text = "$1$3";
+        $res{'status'} = $STATUS_ERR if ($text=~ s/(Blocked.*?},)/$COLOR_BOUNCE$1$COLOR_NORM/g);
+        $res{'msg'} = (($verbose) ? '' :'amavis ') . "$text";
     }
-    return ("", "");
+    return %res;
 }
 
 
@@ -208,7 +243,7 @@ sub clean
             next;
         }
 
-        if ($errors && ($s=~ m/status=sent/i))
+        if ($errors && ($msgs{$key}{'status'} < $STATUS_ERR))
         {
             delete $msgs{$key};
             next;
@@ -222,13 +257,6 @@ sub clean
 #******************************************************************************
 sub printResults
 {
-    my $COLOR_NORM="\e[0;39m";
-    my $COLOR_TO="\e[0;36m";
-    my $COLOR_FROM="\e[0;33m";
-    my $COLOR_OK="\e[0;32m";
-    my $COLOR_BOUNCE="\e[0;31m";
-
-
     # Print results in LESS .............................
     my $num=scalar(keys(%msgs));
     open (PAGER, "| $LESS --prompt='Found $num mails.  Line %lt-%lb.'");
@@ -242,8 +270,8 @@ sub printResults
         $s=~ s/from=<(.*?)>/from=<$COLOR_FROM$1$COLOR_NORM>/g;
 
         my $status='';
-        $status=$COLOR_OK     if ($s=~ s/(status=sent.*)/$COLOR_OK$1$COLOR_NORM/g);
-        $status=$COLOR_BOUNCE if ($s=~ s/(status=bounced.*)/$COLOR_BOUNCE$1$COLOR_NORM/g);
+        $status=$COLOR_OK     if ($msgs{$key}{'status'} == $STATUS_OK);
+        $status=$COLOR_BOUNCE if ($msgs{$key}{'status'} == $STATUS_ERR);
 
         print PAGER sprintf("%s%s  ...............................%s%s\n%s\n\n\n",
                             $status,
