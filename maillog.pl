@@ -126,8 +126,10 @@ sub scanFile
     }
 
 
+    my $line=0;
     while (<FILE>)
     {
+        $line++;
         next if (!(m/^(\S\S\S) +(\d?\d)/));
 
         next if !exists $MONTHS{$1};
@@ -161,7 +163,7 @@ sub scanFile
         if ($rec{'id'})
         {
             my $id = $rec{'id'};
-            $msgs{$id}{'order'}=$date . $time;
+            $msgs{$id}{'order'}=$date . $time . $line;
             $msgs{$id}{'date'}=$date;
             $msgs{$id}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $rec{'msg'}";
             $msgs{$id}{'status'} = $rec{'status'} if ($msgs{$id}{'status'} < $rec{'status'});
