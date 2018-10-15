@@ -156,8 +156,8 @@ sub scanFile
         my $msg=$6;
 
         my %rec;
-        %rec = parsePostfixLine($msg)   if ($proc =~ m/^postfix/);
-        %rec = parseAmavisLine($msg)    if ($proc =~ m/^amavis/);
+        %rec = parsePostfixLine($msg, $date, $time) if ($proc =~ m/^postfix/);
+        %rec = parseAmavisLine($msg, $date, $time)  if ($proc =~ m/^amavis/);
 
 
         if ($rec{'id'})
@@ -165,6 +165,7 @@ sub scanFile
             my $id = $rec{'id'};
             $msgs{$id}{'order'}=$date . $time . $line;
             $msgs{$id}{'date'}=$date;
+            $msgs{$id}{'header'}=$rec{'header'};
             $msgs{$id}{'msg'}.="\n $time " . (($verbose)?$proc:'') . " $rec{'msg'}";
             $msgs{$id}{'status'} = $rec{'status'} if ($msgs{$id}{'status'} < $rec{'status'});
         };
@@ -189,17 +190,32 @@ sub newParseResult
 sub parsePostfixLine
 {
     my $msg  = shift;
+    my $date = shift;
+    my $time = shift;
     my %res = newParseResult();
 
     if ($msg=~ m/^([0-9A-Fa-f]+): (.*)/)
     {
         $res{'id'} = $1;
+        $res{'header'} = $1;
 
         my $text = $2;
         $res{'status'} = $STATUS_OK  if ($text=~ s/(status=sent.*)/$COLOR_OK$1$COLOR_NORM/g);
         $res{'status'} = $STATUS_ERR if ($text=~ s/(status=bounced.*)/$COLOR_BOUNCE$1$COLOR_NORM/g);
         $res{'msg'} = $text;
     };
+
+
+    if ($msg=~ m/^NOQUEUE: (.*)/)
+    {
+        $res{'id'} = $date . $time;
+        $res{'header'} = "NOQUEUE";
+
+        my $text = $1;
+        $res{'status'} = $STATUS_OK;
+        $res{'msg'} = $text;
+    };
+
 
     return %res;
 }
@@ -211,11 +227,14 @@ sub parsePostfixLine
 sub parseAmavisLine
 {
     my $msg  = shift;
+    my $date = shift;
+    my $time = shift;
     my %res = newParseResult();
 
     if ($msg=~ m/(.*)Queue-ID: ([0-9A-Fa-f]+),(.*)/)
     {
         $res{'id'} = $2;
+        $res{'header'} = $2;
 
         my $text = "$1$3";
         $res{'status'} = $STATUS_ERR if ($text=~ s/(Blocked.*?},)/$COLOR_BOUNCE$1$COLOR_NORM/g);
@@ -263,6 +282,8 @@ sub printResults
     my $num=scalar(keys(%msgs));
     open (PAGER, "| $LESS --prompt='Found $num mails.  Line %lt-%lb.'");
 
+    my $prevHeader;
+    my $delim;
     foreach my $key (sort{$msgs{$a}{'order'} cmp $msgs{$b}{'order'}}(keys(%msgs)))
     {
 
@@ -275,14 +296,23 @@ sub printResults
         $status=$COLOR_OK     if ($msgs{$key}{'status'} == $STATUS_OK);
         $status=$COLOR_BOUNCE if ($msgs{$key}{'status'} == $STATUS_ERR);
 
-        print PAGER sprintf("%s%s  ...............................%s%s\n%s\n\n\n",
+        my $header = sprintf("%s%s  ...............................%s%s\n",
                             $status,
-                            $key,
+                            $msgs{$key}{'header'},
                             $COLOR_NORM,
-                            $msgs{$key}{'date'},
-                            $s);
+                            $msgs{$key}{'date'});
+
+        if ($header ne $prevHeader)
+        {
+            $prevHeader = $header;
+            print PAGER $delim;
+            print PAGER $header;
+            $delim = "\n\n\n"
+        }
+        print PAGER $s;
     }
 
+    print PAGER "\n";
     close(PAGER);
 }
 
